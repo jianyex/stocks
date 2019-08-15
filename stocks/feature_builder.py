@@ -1,12 +1,17 @@
 # -*- coding: utf-8 -*-
 import pandas as pd
 import os
+import talib
+from stocks.sqlite_connector import SqliteConnector
 
 class FeatureBuilder:
     def __init__(self, data):
         self._data = data
 
     def add_features(self):
+        pass
+
+    def add_label(self, label_def_func):
         pass
 
     @property
@@ -19,9 +24,9 @@ class FeatureBuilder:
 
 if __name__ == "__main__":
     current_dir = os.getcwd()
-    csv_data_path = os.path.join(current_dir, "../data/stocks.csv")
-    columns = ['Adj_Close','Close','Date','High','Low','Open','Symbol','Volume']
-    data = pd.read_csv(csv_data_path, header=None)
-    data.columns = columns
+    db_file_path = os.path.join(current_dir, "../data/stocks.db")
+    conn = SqliteConnector(db_file_path)
+    query = "SELECT * FROM raw_stock_data WHERE symbol in ('AAPL', 'GILD') ORDER BY symbol, date;"
+    data = conn.pull_data_as_df(query)
     feature_builder = FeatureBuilder(data=data)
-    print(data.head())
+    print(feature_builder.data)

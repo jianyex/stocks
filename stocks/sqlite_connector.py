@@ -43,11 +43,15 @@ class SqliteConnector(object):
     def create_table(self):
         Base.metadata.create_all(self.engine)
 
-    def dump_df_to_sql(self, df):
+    def dump_df_to_sql(self, df, table):
         assert isinstance(df, pd.DataFrame)
-        df.to_sql("raw_stocks_data", con=self.engine)
+        if self.engine.dialect.has_table(self.engine, table):
+            df.to_sql(table, if_exists='append', index=False, con=self.engine)
+        else:
+            df.to_sql(table, index=False, con=self.engine)
 
     def pull_data_as_df(self, query):
+        assert isinstance(query, str)
         try:
             data_fetched = self.session.execute(query)
             columns = data_fetched.keys()
@@ -73,4 +77,4 @@ if __name__ == "__main__":
     data = pd.read_csv(csv_data_path, header=None)
     data.columns = columns
     sql_connector = SqliteConnector(db_data_path)
-    #sql_connector.dump_df_to_sql(data)
+    #sql_connector.dump_df_to_sql(df=data, table="raw_stock_data")
