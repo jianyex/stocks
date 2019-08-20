@@ -5,7 +5,7 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, Date
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.sql import func
+import datetime
 
 Base = declarative_base()
 
@@ -32,6 +32,23 @@ class RawStockData(Base):
         self.symbol =  record["symbol"]
         self.volume = record["volume"]
 
+class InvestingComSp500Today(Base):
+    __tablename__ = 'investing_com_sp500_today'
+
+    id = Column(Integer, primary_key=True)
+    date = Column(String)
+    raw_json_data = Column(String)
+    create_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    def __init__(self, record):
+        self.date = record["date"]
+        self.raw_json_data = record["raw_json_data"]
+
+RELATIONS = {
+    "raw_stock_data": RawStockData,
+    "investing_com_sp500_today": InvestingComSp500Today
+}
+
 class SqliteConnector(object):
     def __init__(self, db_file_path):
         DB_PATH = "sqlite:///" + db_file_path
@@ -42,6 +59,18 @@ class SqliteConnector(object):
 
     def create_table(self):
         Base.metadata.create_all(self.engine)
+
+    def insert_records(self, table, records):
+        relation = RELATIONS[table]
+        items = []
+        for record in records:
+            items.append(relation(record))
+        try:
+            self.session.add_all(items)
+            self.session.commit()
+        except:
+            self.session.rollback()
+            raise
 
     def dump_df_to_sql(self, df, table):
         assert isinstance(df, pd.DataFrame)
@@ -73,7 +102,7 @@ if __name__ == "__main__":
     current_dir = os.getcwd()
     csv_data_path = os.path.join(current_dir, "../data/stocks.csv")
     db_data_path = os.path.join(current_dir, "../data/stocks.db")
-    columns = ['adj_close','close','date','high','low','open','symbol','volume']
+    columns = ['adj_close', 'close', 'date', 'high','low', 'open','symbol', 'volume']
     data = pd.read_csv(csv_data_path, header=None)
     data.columns = columns
     sql_connector = SqliteConnector(db_data_path)

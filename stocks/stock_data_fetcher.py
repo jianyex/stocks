@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 import datetime
 
+from selenium import webdriver
 import pandas as pd
 import requests
 import abc
+
+from stocks.constants import chromedriver_path
 
 class AbsStockDataFetcher(metaclass=abc.ABCMeta):
     """
@@ -27,7 +30,7 @@ class AbsStockDataFetcher(metaclass=abc.ABCMeta):
 class YahooFinanceStockDataFetcher(AbsStockDataFetcher):
 
     def __init__(self):
-        pass
+        super().__init__()
 
     def get_historical_data(self, symbol, start, end):
         """
@@ -57,7 +60,6 @@ class YahooFinanceStockDataFetcher(AbsStockDataFetcher):
                'includePrePost=true&events=div%7Csplit%7Cearn&lang=en-US&'
                'region=US&crumb=t5QZMhgytYZ&corsDomain=finance.yahoo.com'
                ).format(symbol=symbol, start=start_date_timestamp_str, end=end_date_timestamp_str)
-        print(url)
         response_json = requests.get(url).json()
         return response_json
 
@@ -70,15 +72,119 @@ class YahooFinanceStockDataFetcher(AbsStockDataFetcher):
         data_json = response_json['chart']['result'][0]
         quote_data = data_json["indicators"]["quote"][0]
         df = pd.DataFrame(quote_data)
-        quote_date = [datetime.datetime.fromtimestamp(i).strftime("%Y-%m-%d") for i in data_json["timestamp"]]
-        df["date"] = quote_date
+        try:
+            quote_date = [datetime.datetime.fromtimestamp(i).strftime("%Y-%m-%d") for i in data_json["timestamp"]]
+            adjclose = data_json["indicators"]["adjclose"][0]["adjclose"]
+            df["date"] = quote_date
+            df["adj_close"] = adjclose
+            df["symbol"] = data_json["meta"]["symbol"]
+            df = df.loc[:, ["adj_close", "close", "date", "high", "low", "open", "symbol", "volume"]]
+        except KeyError:
+            print("Data does not exist for stock {}?".format(symbol))
         return df
 
-if __name__ == "__main__":
-    symbol = "SQ"
-    start = "2019-01-01"
-    end = "2019-02-01"
-    yahoo_finance = YahooFinanceStockDataFetcher()
-    df = yahoo_finance.get_historical_data(symbol, start, end)
-    print(df)
+class InvestingComSp500TodayFetcher(AbsStockDataFetcher):
+    """
+    Fetch the today's quote of Sp500 stocks
+    """
+    def __init__(self):
+        self.website_url = 'https://www.investing.com/indices/investing.com-us-500-components'
+        self.driver = webdriver.Chrome(chromedriver_path)
+        super().__init__()
 
+    def get_historical_data(self):
+        self._download_barchart_page()
+        data = self._parse_barchart_page()
+        return data
+
+    def _download_barchart_page(self):
+        self.driver.get(self.website_url)
+
+    def _parse_barchart_page(self):
+        """
+        Parse the html downloaded from investing.com and return a dict for the sp500 companies
+        :return:
+        """
+        data_dict = {}
+        data_table = self.driver.find_element_by_xpath('//*[@id="cr1"]/tbody')
+        trs = data_table.find_elements_by_tag_name('tr')
+        for tr in trs:
+            tds = tr.find_elements_by_tag_name('td')
+            temp_stock_values_dict = {}
+            for td in tds:
+                if td.get_attribute("class") == 'bold left noWrap elp plusIconTd':
+                    company_name = td.text
+                else:
+                    stock_attribute = td.get_attribute("class")
+                    stock_attribute = stock_attribute.strip()
+                    stock_value = td.text
+                    temp_stock_values_dict[stock_attribute] = stock_value
+            data_dict[company_name] = temp_stock_values_dict
+        return data_dict
+
+
+    def _convert_data_to_df(self):
+        pass
+
+
+
+
+if __name__ == "__main__":
+    from stocks.sqlite_connector import SqliteConnector
+    from stocks.constants import db_file_path, SYMBOLS
+    import random
+    import time
+
+    # conn = SqliteConnector(db_file_path)
+    # yahoo_finance = YahooFinanceStockDataFetcher()
+    # start = '2017-01-01'
+    # end = str(datetime.datetime.today().strftime('%Y-%m-%d'))
+    #
+    # for symbol in SYMBOLS:
+    #     current_data = conn.pull_data_as_df(
+    #         "select * from raw_stock_data where symbol='{}' and date > '2019-01-01';".format(symbol))
+    #     if len(current_data) > 140:
+    #         print("Data for stock {} already exists...".format(symbol))
+    #     else:
+    #         print("Start fetching data for stock {}...".format(symbol))
+    #         df = yahoo_finance.get_historical_data(symbol, start, end)
+    #         print(df.head())
+    #         print(df.tail())
+    #         conn.dump_df_to_sql(df, "raw_stock_data")
+    #         time.sleep(200 + random.randint(-50, 50))
+    #         print("End fetching data for stock {}...".format(symbol))
+
+
+    # barchart_url = 'https://www.investing.com/indices/investing.com-us-500-components'
+    # from stocks.constants import chromedriver_path
+    # from selenium import webdriver
+    # driver = webdriver.Chrome(chromedriver_path)
+    # driver.get(barchart_url)
+    #
+    # data = driver.find_element_by_xpath('//*[@id="cr1"]/tbody')
+    # trs = data.find_elements_by_tag_name('tr')
+    # for tr in trs:
+    #     tds = tr.find_elements_by_tag_name('td')
+    #     for td in tds:
+    #         print(td.get_attribute("class"))
+    #         print(td.text)
+
+    #def selenium_login(url, username, password):
+    # username = "ralphxu28@gmail.com"
+    # password = "Masonxu218"
+    # url = "https://www.barchart.com/login"
+    # driver = webdriver.Chrome(chromedriver_path)
+    # driver.get(url)
+    # driver.maximize_window()
+    # driver.implicitly_wait(20)
+    # username_element = driver.find_element_by_id("email")
+    # password_element = driver.find_element_by_id("password")
+    # username_element.send_keys(username)
+    # password_element.send_keys(password)
+    # driver.find_element_by_name("Log In").click()
+
+    from selenium import webdriver
+    from stocks.constants import chromedriver_path
+    investing_com_data_fetcher = InvestingComSp500TodayFetcher()
+    data = investing_com_data_fetcher.get_historical_data()
+    print(data)
