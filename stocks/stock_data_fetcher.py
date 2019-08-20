@@ -8,6 +8,7 @@ import abc
 
 from stocks.constants import chromedriver_path
 
+
 class AbsStockDataFetcher(metaclass=abc.ABCMeta):
     """
     Abstract stock data fetcher class
@@ -83,10 +84,12 @@ class YahooFinanceStockDataFetcher(AbsStockDataFetcher):
             print("Data does not exist for stock {}?".format(symbol))
         return df
 
+
 class InvestingComSp500TodayFetcher(AbsStockDataFetcher):
     """
     Fetch the today's quote of Sp500 stocks
     """
+
     def __init__(self):
         self.website_url = 'https://www.investing.com/indices/investing.com-us-500-components'
         self.driver = webdriver.Chrome(chromedriver_path)
@@ -122,69 +125,5 @@ class InvestingComSp500TodayFetcher(AbsStockDataFetcher):
             data_dict[company_name] = temp_stock_values_dict
         return data_dict
 
-
     def _convert_data_to_df(self):
         pass
-
-
-
-
-if __name__ == "__main__":
-    from stocks.sqlite_connector import SqliteConnector
-    from stocks.constants import db_file_path, SYMBOLS
-    import random
-    import time
-
-    # conn = SqliteConnector(db_file_path)
-    # yahoo_finance = YahooFinanceStockDataFetcher()
-    # start = '2017-01-01'
-    # end = str(datetime.datetime.today().strftime('%Y-%m-%d'))
-    #
-    # for symbol in SYMBOLS:
-    #     current_data = conn.pull_data_as_df(
-    #         "select * from raw_stock_data where symbol='{}' and date > '2019-01-01';".format(symbol))
-    #     if len(current_data) > 140:
-    #         print("Data for stock {} already exists...".format(symbol))
-    #     else:
-    #         print("Start fetching data for stock {}...".format(symbol))
-    #         df = yahoo_finance.get_historical_data(symbol, start, end)
-    #         print(df.head())
-    #         print(df.tail())
-    #         conn.dump_df_to_sql(df, "raw_stock_data")
-    #         time.sleep(200 + random.randint(-50, 50))
-    #         print("End fetching data for stock {}...".format(symbol))
-
-
-    # barchart_url = 'https://www.investing.com/indices/investing.com-us-500-components'
-    # from stocks.constants import chromedriver_path
-    # from selenium import webdriver
-    # driver = webdriver.Chrome(chromedriver_path)
-    # driver.get(barchart_url)
-    #
-    # data = driver.find_element_by_xpath('//*[@id="cr1"]/tbody')
-    # trs = data.find_elements_by_tag_name('tr')
-    # for tr in trs:
-    #     tds = tr.find_elements_by_tag_name('td')
-    #     for td in tds:
-    #         print(td.get_attribute("class"))
-    #         print(td.text)
-
-    #def selenium_login(url, username, password):
-    # username = "ralphxu28@gmail.com"
-    # password = "Masonxu218"
-    # url = "https://www.barchart.com/login"
-    # driver = webdriver.Chrome(chromedriver_path)
-    # driver.get(url)
-    # driver.maximize_window()
-    # driver.implicitly_wait(20)
-    # username_element = driver.find_element_by_id("email")
-    # password_element = driver.find_element_by_id("password")
-    # username_element.send_keys(username)
-    # password_element.send_keys(password)
-    # driver.find_element_by_name("Log In").click()
-
-    from selenium import webdriver
-    from stocks.constants import chromedriver_path
-    investing_com_data_fetcher = InvestingComSp500TodayFetcher()
-    data = investing_com_data_fetcher.get_historical_data()
-    print(data)
